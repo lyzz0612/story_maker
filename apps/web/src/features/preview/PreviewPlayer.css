@@ -1,0 +1,92 @@
+.preview-player {
+  display: grid;
+  gap: 14px;
+  color: #172033;
+}
+
+.preview-player__frame {
+  position: relative;
+  width: 100%;
+  margin: 0 auto;
+  overflow: hidden;
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 22px;
+  box-shadow: 0 28px 70px rgba(15, 23, 42, 0.18);
+}
+
+.preview-player__host {
+  display: grid;
+  width: 100%;
+  place-items: center;
+}
+
+.preview-player__host canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.preview-player__hint {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  padding: 8px 10px;
+  color: #f8fafc;
+  font-size: 12px;
+  font-weight: 800;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(248, 250, 252, 0.24);
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.preview-player__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+}
+
+.preview-player__controls button {
+  min-height: 38px;
+  padding: 0 16px;
+  color: #172033;
+  font: inherit;
+  font-weight: 800;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.preview-player__controls button:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #64748b;
+}
+
+.preview-player__controls button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.preview-player__controls strong {
+  min-width: 160px;
+  text-align: center;
+}
+
+.preview-player__empty,
+.preview-player__error {
+  padding: 18px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 16px;
+}
+
+.preview-player__error {
+  margin: 0;
+  color: #9f1239;
+  background: #fff1f2;
+  border-color: #fecdd3;
+}

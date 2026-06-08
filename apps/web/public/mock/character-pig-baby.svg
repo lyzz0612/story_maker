@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="260" viewBox="0 0 240 260" role="img" aria-label="Baby pig character mock">
+  <rect width="240" height="260" rx="32" fill="#fefce8"/>
+  <ellipse cx="120" cy="165" rx="66" ry="54" fill="#f9a8d4"/>
+  <circle cx="120" cy="88" r="50" fill="#fbcfe8"/>
+  <circle cx="80" cy="40" r="18" fill="#fbcfe8"/>
+  <circle cx="160" cy="40" r="18" fill="#fbcfe8"/>
+  <ellipse cx="120" cy="97" rx="27" ry="18" fill="#fce7f3"/>
+  <circle cx="104" cy="78" r="7" fill="#111827"/>
+  <circle cx="136" cy="78" r="7" fill="#111827"/>
+  <circle cx="112" cy="97" r="4" fill="#be185d"/>
+  <circle cx="128" cy="97" r="4" fill="#be185d"/>
+  <path d="M100 118 Q120 134 140 118" fill="none" stroke="#be185d" stroke-width="6" stroke-linecap="round"/>
+  <rect x="78" y="213" width="22" height="34" rx="11" fill="#f9a8d4"/>
+  <rect x="140" y="213" width="22" height="34" rx="11" fill="#f9a8d4"/>
+  <text x="54" y="242" fill="#be185d" font-family="Arial, sans-serif" font-size="18" font-weight="700">baby pig</text>
+</svg>

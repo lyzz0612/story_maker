@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="260" viewBox="0 0 240 260" role="img" aria-label="Pink pig character mock">
+  <rect width="240" height="260" rx="32" fill="#fff1f2"/>
+  <ellipse cx="120" cy="162" rx="72" ry="58" fill="#fb7185"/>
+  <circle cx="120" cy="86" r="55" fill="#fda4af"/>
+  <circle cx="76" cy="35" r="20" fill="#fda4af"/>
+  <circle cx="164" cy="35" r="20" fill="#fda4af"/>
+  <ellipse cx="120" cy="95" rx="29" ry="20" fill="#fecdd3"/>
+  <circle cx="102" cy="75" r="7" fill="#111827"/>
+  <circle cx="138" cy="75" r="7" fill="#111827"/>
+  <circle cx="111" cy="95" r="5" fill="#be123c"/>
+  <circle cx="129" cy="95" r="5" fill="#be123c"/>
+  <rect x="74" y="214" width="24" height="36" rx="12" fill="#fb7185"/>
+  <rect x="142" y="214" width="24" height="36" rx="12" fill="#fb7185"/>
+  <text x="54" y="242" fill="#be123c" font-family="Arial, sans-serif" font-size="18" font-weight="700">pink pig</text>
+</svg>

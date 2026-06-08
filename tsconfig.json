@@ -1,0 +1,8 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/scene-schema" },
+    { "path": "apps/server" },
+    { "path": "apps/web" }
+  ]
+}

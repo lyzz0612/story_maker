@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="260" height="260" viewBox="0 0 260 260" role="img" aria-label="Hammer frame 3">
+  <rect width="260" height="260" fill="none"/>
+  <ellipse cx="124" cy="176" rx="68" ry="52" fill="#111827"/>
+  <circle cx="124" cy="102" r="48" fill="#1f2937"/>
+  <circle cx="88" cy="58" r="18" fill="#1f2937"/>
+  <circle cx="160" cy="58" r="18" fill="#1f2937"/>
+  <ellipse cx="124" cy="110" rx="25" ry="17" fill="#374151"/>
+  <circle cx="108" cy="94" r="6" fill="#ffffff"/>
+  <circle cx="140" cy="94" r="6" fill="#ffffff"/>
+  <line x1="96" y1="126" x2="48" y2="150" stroke="#78350f" stroke-width="13" stroke-linecap="round"/>
+  <rect x="8" y="139" width="48" height="22" rx="6" fill="#64748b"/>
+  <text x="30" y="238" fill="#475569" font-family="Arial, sans-serif" font-size="18" font-weight="700">frame 3</text>
+</svg>
