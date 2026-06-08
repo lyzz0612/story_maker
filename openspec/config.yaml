@@ -1,0 +1,18 @@
+schema: spec-driven
+
+# 项目上下文（可选）
+context: |
+  Story Maker：个人 AI 互动绘本创作工具（给孩子做书，单用户）。
+  制作端：本地 Web（React + TS + Pixi 预览）；阅读在自研平板 App（导出后续）。
+  亮点：家庭主角库跨书一致、简略输入+对话改大纲、分层场景图+交互模板（L1 主，L2 MVP 探测）。
+  文档：docs/project-overview.md、docs/tech-stack.md、docs/agreed-requirements.md
+
+# 每个工件的规则（可选）
+# 为特定工件添加自定义规则。
+# 示例：
+#   rules:
+#     proposal:
+#       - 保持提案在500字以内
+#       - 始终包含"非目标"部分
+#     tasks:
+#       - 将任务分解为最多2小时的块
