@@ -17,6 +17,7 @@ describe("scene-schema contracts", () => {
           pageNumber: 1,
           summary: "三只小猪准备出发。",
           text: "第 1 页文案",
+          imagePrompt: "儿童绘本插画，三只小猪在森林小路上出发，温暖水彩风格",
           castCharacterIds: ["char_baby"],
           temporaryCharacters: ["小白猪", "小花猪", "小黑猪"],
           status: "draft",
@@ -34,7 +35,7 @@ describe("scene-schema contracts", () => {
 
   it("represents asset sheets with normalized regions and frame sequences", () => {
     const assetSheet: AssetSheet = {
-      sourceUrl: "/mock/projects/project_three_pigs/pages/4/asset-sheet.png",
+      sourceUrl: "/assets/projects/project_three_pigs/pages/4/asset-sheet.png",
       regions: [
         {
           id: "region_background",
@@ -51,7 +52,7 @@ describe("scene-schema contracts", () => {
       ],
       sequences: {
         hammer: {
-          frames: ["/mock/hammer-1.png", "/mock/hammer-2.png"],
+          frames: ["/assets/hammer-1.png", "/assets/hammer-2.png"],
           fps: 6,
           loop: true
         }
@@ -75,7 +76,7 @@ describe("scene-schema contracts", () => {
           id: "background",
           kind: "background",
           name: "Forest background",
-          sourceUrl: "/mock/background.png",
+          sourceUrl: "/assets/background.png",
           x: 0,
           y: 0,
           width: 1280,
@@ -85,7 +86,7 @@ describe("scene-schema contracts", () => {
           id: "hammering-pig",
           kind: "sprite_sequence",
           name: "Hammering pig",
-          frames: ["/mock/hammer-1.png", "/mock/hammer-2.png"],
+          frames: ["/assets/hammer-1.png", "/assets/hammer-2.png"],
           fps: 6,
           loop: true,
           x: 540,

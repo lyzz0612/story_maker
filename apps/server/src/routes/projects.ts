@@ -1,5 +1,16 @@
 import type { FastifyPluginAsync } from "fastify";
-import { applyMockChat, createProjectFromBrief, mockGeneratePage } from "../mock.js";
+import { saveAssetSheetImage } from "../assetStorage.js";
+import {
+  getAssetGenerateJob,
+  startAssetGenerateJob,
+  type AssetGenerateJobInput
+} from "../assetGenerateJobs.js";
+import {
+  applyMockChat,
+  createProjectFromBrief,
+  defaultProjectAssetSheet,
+  mockGeneratePage
+} from "../mock.js";
 import { HttpError, listValues, now, requireItem, store } from "../store.js";
 import type { AssetSheet, OutlinePage, Project } from "../types.js";
 
@@ -18,6 +29,7 @@ type ProjectPatchBody = Partial<Pick<Project, "title" | "brief" | "artStyleId" |
 type OutlinePatchBody = OutlinePage[] | { outline?: Partial<OutlinePage>[]; pages?: Partial<OutlinePage>[] };
 type PagePatchBody = Partial<Omit<OutlinePage, "pageNumber">>;
 type ChatBody = { message?: string };
+type GenerateAssetBody = AssetGenerateJobInput;
 
 const parsePageNumber = (value: string, project: Project) => {
   const pageNumber = Number(value);
@@ -64,6 +76,26 @@ const buildExports = (assetSheet: AssetSheet) =>
     exports[region.id] = `${region.role}/${region.sequenceId ?? "region"}-${region.frameIndex ?? 0}.png`;
     return exports;
   }, {});
+
+const ensureProjectAssetSheet = (project: Project) => {
+  if (!project.assetSheet) {
+    project.assetSheet = defaultProjectAssetSheet();
+  }
+  return project.assetSheet;
+};
+
+const patchAssetSheet = (current: AssetSheet, patch: Partial<AssetSheet>): AssetSheet => {
+  const nextAssetSheet: AssetSheet = {
+    ...current,
+    ...patch,
+    sourceUrl: patch.sourceUrl ?? current.sourceUrl,
+    regions: patch.regions ?? current.regions,
+    sequences: patch.sequences ?? current.sequences,
+    updatedAt: now()
+  };
+  nextAssetSheet.exports = buildExports(nextAssetSheet);
+  return nextAssetSheet;
+};
 
 export const projectRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/projects", async () => listValues(store.projects).map(makeProjectSummary));
@@ -151,7 +183,7 @@ export const projectRoutes: FastifyPluginAsync = async (fastify) => {
     return page;
   });
 
-  fastify.post<{ Params: PageParams }>("/projects/:id/pages/:n/mock-generate", async (request) => {
+  fastify.post<{ Params: PageParams }>("/projects/:id/pages/:n/generate", async (request) => {
     const project = requireItem(store.projects, request.params.id, "Project");
     const pageNumber = parsePageNumber(request.params.n, project);
     const page = getPage(project, pageNumber);
@@ -163,26 +195,86 @@ export const projectRoutes: FastifyPluginAsync = async (fastify) => {
     return generated;
   });
 
+  fastify.get<{ Params: IdParams }>("/projects/:id/asset-sheet", async (request) => {
+    const project = requireItem(store.projects, request.params.id, "Project");
+    return ensureProjectAssetSheet(project);
+  });
+
+  fastify.post<{ Params: IdParams }>("/projects/:id/asset-sheet/source", async (request, reply) => {
+    const project = requireItem(store.projects, request.params.id, "Project");
+    const file = await request.file();
+    if (!file) {
+      throw new HttpError(400, "Image file is required");
+    }
+
+    const sourceUrl = await saveAssetSheetImage(
+      project.id,
+      await file.toBuffer(),
+      file.mimetype
+    );
+
+    reply.code(201);
+    return { sourceUrl };
+  });
+
+  fastify.post<{ Params: IdParams; Body: GenerateAssetBody }>(
+    "/projects/:id/asset-sheet/generate",
+    async (request, reply) => {
+      const project = requireItem(store.projects, request.params.id, "Project");
+      const prompt = request.body?.prompt?.trim();
+      if (!prompt) {
+        throw new HttpError(400, "prompt is required");
+      }
+
+      const job = startAssetGenerateJob(project, {
+        prompt,
+        label: request.body?.label?.trim(),
+        imageId: request.body?.imageId?.trim() || undefined,
+        artStyleId: request.body?.artStyleId?.trim() || undefined
+      });
+
+      reply.code(202);
+      return { jobId: job.id, status: job.status, startedAt: job.startedAt };
+    }
+  );
+
+  fastify.get<{ Params: IdParams & { jobId: string } }>(
+    "/projects/:id/asset-sheet/generate/:jobId",
+    async (request) => {
+      const job = getAssetGenerateJob(request.params.id, request.params.jobId);
+      if (!job) {
+        throw new HttpError(404, "Generate job not found");
+      }
+      return job;
+    }
+  );
+
+  fastify.patch<{ Params: IdParams; Body: Partial<AssetSheet> }>("/projects/:id/asset-sheet", async (request) => {
+    const project = requireItem(store.projects, request.params.id, "Project");
+    const patch = request.body ?? {};
+    if (patch.sourceUrl?.startsWith("data:")) {
+      throw new HttpError(400, "Upload the image via POST /projects/:id/asset-sheet/source");
+    }
+    project.assetSheet = patchAssetSheet(ensureProjectAssetSheet(project), patch);
+    project.updatedAt = now();
+    store.projects.set(project.id, project);
+    return project.assetSheet;
+  });
+
   fastify.get<{ Params: PageParams }>("/projects/:id/pages/:n/asset-sheet", async (request) => {
     const project = requireItem(store.projects, request.params.id, "Project");
-    const page = getPage(project, parsePageNumber(request.params.n, project));
-    return page.assetSheet;
+    return ensureProjectAssetSheet(project);
   });
 
   fastify.patch<{ Params: PageParams; Body: Partial<AssetSheet> }>("/projects/:id/pages/:n/asset-sheet", async (request) => {
     const project = requireItem(store.projects, request.params.id, "Project");
-    const page = getPage(project, parsePageNumber(request.params.n, project));
-    const nextAssetSheet: AssetSheet = {
-      ...page.assetSheet,
-      ...request.body,
-      sourceUrl: request.body.sourceUrl ?? page.assetSheet.sourceUrl,
-      regions: request.body.regions ?? page.assetSheet.regions,
-      sequences: request.body.sequences ?? page.assetSheet.sequences
-    };
-    nextAssetSheet.exports = buildExports(nextAssetSheet);
-    page.assetSheet = nextAssetSheet;
-    page.updatedAt = now();
-    project.updatedAt = page.updatedAt;
-    return page.assetSheet;
+    const patch = request.body ?? {};
+    if (patch.sourceUrl?.startsWith("data:")) {
+      throw new HttpError(400, "Upload the image via POST /projects/:id/asset-sheet/source");
+    }
+    project.assetSheet = patchAssetSheet(ensureProjectAssetSheet(project), patch);
+    project.updatedAt = now();
+    store.projects.set(project.id, project);
+    return project.assetSheet;
   });
 };

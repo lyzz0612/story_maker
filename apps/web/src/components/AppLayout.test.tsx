@@ -16,7 +16,7 @@ describe("AppLayout", () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByRole("heading", { name: "AI 互动绘本制作端" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "AI 互动绘本制作工坊" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /项目/ })).toHaveAttribute("href", "/");
     expect(screen.getByRole("link", { name: /角色库/ })).toHaveAttribute("href", "/characters");
     expect(screen.getByRole("link", { name: /设置/ })).toHaveAttribute("href", "/settings");

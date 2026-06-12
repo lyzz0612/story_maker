@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
+import { mockGenerateCharacterReferenceUrl } from "../mock.js";
 import { HttpError, listValues, makeId, now, requireItem, store } from "../store.js";
 import type { Character, Relation } from "../types.js";
 
@@ -12,31 +13,34 @@ const toCharacter = (body: CharacterBody, existing?: Character): Character => {
   if (!body.name?.trim()) {
     throw new HttpError(400, "Character name is required");
   }
-  if (!isRelation(body.relation)) {
-    throw new HttpError(400, "Character relation must be baby, dad, mom, or other");
-  }
 
   const timestamp = now();
   return {
     id: existing?.id ?? makeId("char"),
     name: body.name.trim(),
-    relation: body.relation,
+    relation: isRelation(body.relation) ? body.relation : existing?.relation ?? "other",
     appearance: body.appearance?.trim() || "",
-    referenceImageUrl: body.referenceImageUrl || existing?.referenceImageUrl || "/mock/characters/placeholder-ref.png",
+    referenceImageUrl:
+      body.referenceImageUrl?.trim() ||
+      existing?.referenceImageUrl ||
+      "/assets/characters/placeholder-ref.png",
     createdAt: existing?.createdAt ?? timestamp,
     updatedAt: timestamp
   };
 };
 
-const generateReferenceImage = (character: Character) => {
-  const slug = encodeURIComponent(character.name.toLowerCase());
-  const updated: Character = {
-    ...character,
-    referenceImageUrl: `/mock/characters/generated-${slug}-${Date.now().toString(36)}.png`,
-    updatedAt: now()
-  };
-  store.characters.set(updated.id, updated);
-  return updated;
+const referenceFromBody = (body: CharacterBody) => {
+  if (!body.name?.trim()) {
+    throw new HttpError(400, "Character name is required");
+  }
+  if (!body.appearance?.trim()) {
+    throw new HttpError(400, "Character appearance is required");
+  }
+
+  return mockGenerateCharacterReferenceUrl({
+    name: body.name.trim(),
+    appearance: body.appearance.trim()
+  });
 };
 
 export const characterRoutes: FastifyPluginAsync = async (fastify) => {
@@ -48,6 +52,10 @@ export const characterRoutes: FastifyPluginAsync = async (fastify) => {
     reply.code(201);
     return item;
   });
+
+  fastify.post<{ Body: CharacterBody }>("/characters/generate-reference", async (request) => ({
+    referenceImageUrl: referenceFromBody(request.body)
+  }));
 
   fastify.get<{ Params: IdParams }>("/characters/:id", async (request) =>
     requireItem(store.characters, request.params.id, "Character")
@@ -73,18 +81,23 @@ export const characterRoutes: FastifyPluginAsync = async (fastify) => {
     reply.code(204);
   });
 
-  const mockReference = (id: string) => {
-    const character = requireItem(store.characters, id, "Character");
-    return generateReferenceImage(character);
-  };
-
-  fastify.post<{ Params: IdParams }>("/characters/:id/mock-reference-image", async (request) =>
-    mockReference(request.params.id)
-  );
-  fastify.post<{ Params: IdParams }>("/characters/:id/mock-generate-reference", async (request) =>
-    mockReference(request.params.id)
-  );
-  fastify.post<{ Params: IdParams }>("/characters/:id/reference-image/mock-generate", async (request) =>
-    mockReference(request.params.id)
+  fastify.post<{ Params: IdParams; Body?: CharacterBody }>(
+    "/characters/:id/generate-reference",
+    async (request) => {
+      const existing = requireItem(store.characters, request.params.id, "Character");
+      const body = request.body ?? {};
+      const source = {
+        name: body.name?.trim() || existing.name,
+        appearance: body.appearance?.trim() || existing.appearance
+      };
+      const item = {
+        ...existing,
+        ...source,
+        referenceImageUrl: mockGenerateCharacterReferenceUrl(source),
+        updatedAt: now()
+      };
+      store.characters.set(item.id, item);
+      return item;
+    }
   );
 };

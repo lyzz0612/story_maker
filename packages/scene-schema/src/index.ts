@@ -20,7 +20,7 @@ export interface ArtStyle {
   updatedAt: string;
 }
 
-export type LlmProvider = "openai-compatible" | "custom";
+export type LlmProvider = "openai-compatible";
 
 export interface LlmProviderConfig {
   id: string;
@@ -34,7 +34,7 @@ export interface LlmProviderConfig {
   updatedAt: string;
 }
 
-export type ImageProvider = "fal" | "replicate" | "openai-compatible" | "custom";
+export type ImageProvider = "fal" | "replicate" | "openai-compatible";
 
 export interface ImageProviderConfig {
   id: string;
@@ -54,6 +54,7 @@ export interface OutlinePage {
   pageNumber: number;
   summary: string;
   text: string;
+  imagePrompt: string;
   castCharacterIds: string[];
   temporaryCharacters: string[];
   status: PageStatus;
@@ -78,6 +79,7 @@ export interface Project {
   pages?: OutlinePage[];
   pageCount?: number;
   chatMessages?: ChatMessage[];
+  assetSheet?: AssetSheet;
   createdAt: string;
   updatedAt: string;
 }
@@ -99,6 +101,7 @@ export interface AssetRegion {
   frameIndex?: number;
   label?: string;
   exportedName?: string;
+  imageUrl?: string;
 }
 
 export interface AssetSequence {

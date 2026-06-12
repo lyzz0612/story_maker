@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
+import { setAssetGenerateDelayMs, resetAssetGenerateJobs } from "./assetGenerateJobs.js";
 import { buildApp } from "./app.js";
 import type {
   ArtStyle,
@@ -11,14 +12,17 @@ import type {
   Project
 } from "./types.js";
 
-describe("mock API", () => {
+describe("API", () => {
   let app: FastifyInstance;
 
   beforeEach(async () => {
+    setAssetGenerateDelayMs(0);
+    resetAssetGenerateJobs();
     app = await buildApp();
   });
 
   afterEach(async () => {
+    resetAssetGenerateJobs();
     await app.close();
   });
 
@@ -48,18 +52,18 @@ describe("mock API", () => {
         id: "llm_a",
         name: "LLM A",
         provider: "openai-compatible",
-        baseUrl: "https://mock.local/a",
+        baseUrl: "https://api.example.com/a",
         apiKey: "never-sent",
-        model: "mock-a",
+        model: "model-a",
         isDefault: false
       },
       {
         id: "llm_b",
         name: "LLM B",
-        provider: "custom",
-        baseUrl: "https://mock.local/b",
+        provider: "openai-compatible",
+        baseUrl: "https://api.example.com/b",
         apiKey: "never-sent",
-        model: "mock-b",
+        model: "model-b",
         isDefault: true
       }
     ];
@@ -83,9 +87,9 @@ describe("mock API", () => {
           id: "image_only",
           name: "Only Image",
           provider: "fal",
-          baseUrl: "https://mock.local/image",
+          baseUrl: "https://api.example.com/image",
           apiKey: "never-sent",
-          model: "mock-image",
+          model: "image-model",
           isDefault: false
         }
       ]
@@ -106,6 +110,21 @@ describe("mock API", () => {
     });
     expect(createResponse.statusCode).toBe(201);
     const created = createResponse.json<ArtStyle>();
+    expect(created.previewUrl).toMatch(/^\/assets\/styles\/preview-/);
+
+    const draftPreviewResponse = await app.inject({
+      method: "POST",
+      url: "/api/art-styles/generate-preview",
+      payload: {
+        name: "草稿预览",
+        description: "测试描述",
+        promptSuffix: "draft preview prompt"
+      }
+    });
+    expect(draftPreviewResponse.statusCode).toBe(200);
+    expect(draftPreviewResponse.json<{ previewUrl: string }>().previewUrl).toMatch(
+      /^\/assets\/styles\/preview-/
+    );
 
     const updateResponse = await app.inject({
       method: "PATCH",
@@ -113,7 +132,10 @@ describe("mock API", () => {
       payload: { promptSuffix: "updated crayon prompt" }
     });
     expect(updateResponse.statusCode).toBe(200);
-    expect(updateResponse.json<ArtStyle>().promptSuffix).toBe("updated crayon prompt");
+    const updated = updateResponse.json<ArtStyle>();
+    expect(updated.promptSuffix).toBe("updated crayon prompt");
+    expect(updated.previewUrl).toMatch(/^\/assets\/styles\/preview-/);
+    expect(updated.previewUrl).not.toBe(created.previewUrl);
 
     const deleteResponse = await app.inject({
       method: "DELETE",
@@ -122,33 +144,47 @@ describe("mock API", () => {
     expect(deleteResponse.statusCode).toBe(204);
   });
 
-  it("supports character CRUD and mock reference image generation", async () => {
+  it("supports character CRUD and reference image generation", async () => {
+    const draftReferenceResponse = await app.inject({
+      method: "POST",
+      url: "/api/characters/generate-reference",
+      payload: {
+        name: "外婆",
+        appearance: "银色短发，红色围巾"
+      }
+    });
+    expect(draftReferenceResponse.statusCode).toBe(200);
+    const draftReference = draftReferenceResponse.json<{ referenceImageUrl: string }>();
+    expect(draftReference.referenceImageUrl).toContain("/assets/characters/generated-");
+
     const createResponse = await app.inject({
       method: "POST",
       url: "/api/characters",
       payload: {
         name: "外婆",
-        relation: "other",
         appearance: "银色短发，红色围巾",
-        referenceImageUrl: "/mock/characters/grandma-ref.png"
+        referenceImageUrl: draftReference.referenceImageUrl
       }
     });
     expect(createResponse.statusCode).toBe(201);
     const created = createResponse.json<Character>();
+    expect(created.relation).toBe("other");
+    expect(created.referenceImageUrl).toBe(draftReference.referenceImageUrl);
 
     const updateResponse = await app.inject({
       method: "PUT",
       url: `/api/characters/${created.id}`,
-      payload: { ...created, appearance: "银色短发，绿色围巾" }
+      payload: { name: created.name, appearance: "银色短发，绿色围巾" }
     });
     expect(updateResponse.json<Character>().appearance).toContain("绿色围巾");
 
     const referenceResponse = await app.inject({
       method: "POST",
-      url: `/api/characters/${created.id}/mock-generate-reference`
+      url: `/api/characters/${created.id}/generate-reference`,
+      payload: { appearance: "银色短发，绿色围巾" }
     });
     expect(referenceResponse.statusCode).toBe(200);
-    expect(referenceResponse.json<Character>().referenceImageUrl).toContain("/mock/characters/generated-");
+    expect(referenceResponse.json<Character>().referenceImageUrl).toContain("/assets/characters/generated-");
 
     const deleteResponse = await app.inject({
       method: "DELETE",
@@ -187,19 +223,19 @@ describe("mock API", () => {
 
     const generateResponse = await app.inject({
       method: "POST",
-      url: `/api/projects/${project.id}/pages/4/mock-generate`
+      url: `/api/projects/${project.id}/pages/4/generate`
     });
     expect(generateResponse.statusCode).toBe(200);
     const generatedPage = generateResponse.json<OutlinePage>();
     expect(generatedPage.status).toBe("ready");
-    expect(generatedPage.imageUrl).toContain("/mock/projects/");
+    expect(generatedPage.imageUrl).toContain("/assets/projects/");
     expect(generatedPage.sceneGraph?.layers.some((layer) => layer.type === "sprite_sequence")).toBe(true);
 
     const assetResponse = await app.inject({
       method: "PATCH",
       url: `/api/projects/${project.id}/pages/4/asset-sheet`,
       payload: {
-        sourceUrl: "/mock/projects/test/pages/4/asset-sheet.png",
+        sourceUrl: "/assets/projects/test/pages/4/asset-sheet.png",
         regions: [
           {
             id: "background",
@@ -224,5 +260,69 @@ describe("mock API", () => {
       background: "background/region-0.png",
       hammer_0: "sprite_frame/hammer-0.png"
     });
+
+    const pngBase64 =
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+    const pngBuffer = Buffer.from(pngBase64, "base64");
+    const boundary = "----story-maker-test";
+    const uploadPayload = Buffer.concat([
+      Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="asset-sheet.png"\r\nContent-Type: image/png\r\n\r\n`
+      ),
+      pngBuffer,
+      Buffer.from(`\r\n--${boundary}--\r\n`)
+    ]);
+    const uploadResponse = await app.inject({
+      method: "POST",
+      url: `/api/projects/${project.id}/asset-sheet/source`,
+      payload: uploadPayload,
+      headers: {
+        "content-type": `multipart/form-data; boundary=${boundary}`
+      }
+    });
+    expect(uploadResponse.statusCode).toBe(201);
+    expect(uploadResponse.json<{ sourceUrl: string }>().sourceUrl).toBe(
+      `/assets/projects/${project.id}/asset-sheet.png`
+    );
+
+    const rejectDataUrlResponse = await app.inject({
+      method: "PATCH",
+      url: `/api/projects/${project.id}/asset-sheet`,
+      payload: {
+        sourceUrl: `data:image/png;base64,${pngBase64}`
+      } satisfies Partial<AssetSheet>
+    });
+    expect(rejectDataUrlResponse.statusCode).toBe(400);
+
+    const assetGenerateResponse = await app.inject({
+      method: "POST",
+      url: `/api/projects/${project.id}/asset-sheet/generate`,
+      payload: {
+        prompt: "cute pink pig standing",
+        label: "pink pig"
+      }
+    });
+    expect(assetGenerateResponse.statusCode).toBe(202);
+    const { jobId } = assetGenerateResponse.json<{ jobId: string }>();
+
+    let generated: { status: string; result?: { imageUrl: string; prompt: string } } | null = null;
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const jobResponse = await app.inject({
+        method: "GET",
+        url: `/api/projects/${project.id}/asset-sheet/generate/${jobId}`
+      });
+      expect(jobResponse.statusCode).toBe(200);
+      generated = jobResponse.json();
+      if (generated.status === "succeeded" || generated.status === "failed") {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    expect(generated?.status).toBe("succeeded");
+    expect(generated?.result?.imageUrl).toMatch(
+      new RegExp(`^/assets/projects/${project.id}/generated/pink-pig-`)
+    );
+    expect(generated?.result?.prompt).toContain("cute pink pig standing");
   });
 });

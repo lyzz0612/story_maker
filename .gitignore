@@ -3,5 +3,7 @@ dist/
 .env
 .env.local
 *.log
+logs/
 *.tsbuildinfo
 apps/web/.vite/
+apps/web/public/assets/projects/

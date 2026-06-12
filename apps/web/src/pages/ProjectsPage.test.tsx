@@ -59,8 +59,8 @@ describe("ProjectsPage", () => {
     );
 
     expect(await screen.findByText("三只小猪和宝宝的新房子")).toBeInTheDocument();
-    expect(screen.getByText("8 页绘本")).toBeInTheDocument();
+    expect(screen.getByText("8 页", { exact: false })).toBeInTheDocument();
+    expect(screen.getByText("2 角色", { exact: false })).toBeInTheDocument();
     expect(screen.getByText("温暖水彩")).toBeInTheDocument();
-    expect(screen.getByText("出场固定角色 2 个")).toBeInTheDocument();
   });
 });

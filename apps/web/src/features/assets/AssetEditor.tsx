@@ -434,7 +434,7 @@ export function AssetEditor({
       setDraft(next);
     }
     onChange?.(next);
-    setStatus("Mock export mapping refreshed.");
+    setStatus("导出映射已刷新。");
     return next;
   }
 
@@ -467,7 +467,7 @@ export function AssetEditor({
     <section className={["asset-editor", className].filter(Boolean).join(" ")}>
       <div className="asset-editor__toolbar">
         <label>
-          Mock atlas
+          图集
           <select
             value={draft.sourceUrl}
             onChange={(event) => handleSourceChange(event.target.value)}
@@ -481,7 +481,7 @@ export function AssetEditor({
           </select>
         </label>
         <button type="button" onClick={exportRegions}>
-          Mock export regions
+          导出区域
         </button>
         <button type="button" onClick={handleSave}>
           Save asset sheet
@@ -490,7 +490,7 @@ export function AssetEditor({
 
       <div className="asset-editor__body">
         <div className="asset-editor__stage">
-          <img src={draft.sourceUrl} alt="Mock atlas" draggable={false} />
+          <img src={draft.sourceUrl} alt="图集预览" draggable={false} />
           <svg
             ref={svgRef}
             className="asset-editor__overlay"
@@ -682,7 +682,7 @@ export function AssetEditor({
             )}
           </div>
 
-          <h3>Mock export map</h3>
+          <h3>导出映射</h3>
           <ul className="asset-editor__exports">
             {Object.entries(exportMap).map(([regionId, logicalName]) => (
               <li key={regionId}>

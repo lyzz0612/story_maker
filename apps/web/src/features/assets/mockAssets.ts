@@ -9,17 +9,17 @@ export interface MockAssetOption {
 export const MOCK_ASSET_OPTIONS: MockAssetOption[] = [
   {
     label: "Pig house atlas",
-    url: "/mock/pig-house-atlas.svg",
+    url: "/assets/pig-house-atlas.svg",
     description: "Background, hammer frames, and preview guide regions.",
   },
   {
     label: "Intro background",
-    url: "/mock/background-intro.svg",
+    url: "/assets/background-intro.svg",
     description: "Simple outdoor page background.",
   },
   {
     label: "House background",
-    url: "/mock/background-house.svg",
+    url: "/assets/background-house.svg",
     description: "Static building-scene background.",
   },
 ];
@@ -78,7 +78,7 @@ const defaultRegions: AssetRegion[] = [
 ];
 
 export const DEFAULT_MOCK_ASSET_SHEET: AssetSheet = {
-  sourceUrl: "/mock/pig-house-atlas.svg",
+  sourceUrl: "/assets/pig-house-atlas.svg",
   regions: defaultRegions,
   sequences: {
     hammer: {

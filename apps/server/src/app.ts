@@ -1,8 +1,10 @@
 import cors from "@fastify/cors";
+import multipart from "@fastify/multipart";
 import Fastify, { type FastifyInstance } from "fastify";
 import type { FastifyError } from "fastify";
 import { artStyleRoutes } from "./routes/art-styles.js";
 import { characterRoutes } from "./routes/characters.js";
+import { deployRoutes } from "./routes/deploy.js";
 import { projectRoutes } from "./routes/projects.js";
 import { settingsRoutes } from "./routes/settings.js";
 import { seedStore } from "./seed.js";
@@ -17,8 +19,15 @@ export const buildApp = async (): Promise<FastifyInstance> => {
     }
   });
 
+  await fastify.register(multipart, {
+    limits: {
+      fileSize: 50 * 1024 * 1024
+    }
+  });
+
+  const webPort = process.env.WEB_PORT ?? "5174";
   await fastify.register(cors, {
-    origin: ["http://localhost:5173", "http://127.0.0.1:5173"],
+    origin: [`http://localhost:${webPort}`, `http://127.0.0.1:${webPort}`],
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
   });
 
@@ -42,6 +51,7 @@ export const buildApp = async (): Promise<FastifyInstance> => {
       await api.register(artStyleRoutes);
       await api.register(characterRoutes);
       await api.register(projectRoutes);
+      await api.register(deployRoutes);
     },
     { prefix: "/api" }
   );

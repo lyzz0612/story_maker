@@ -14,20 +14,20 @@ export const seedStore = () => {
   const llmConfigs: LlmProviderConfig[] = [
     {
       id: "llm_story_mock",
-      name: "Mock Story Writer",
+      name: "故事创作",
       provider: "openai-compatible",
-      baseUrl: "https://mock.local/v1",
-      apiKey: "mock-key-never-sent",
-      model: "mock-story-large",
+      baseUrl: "https://api.openai.com/v1",
+      apiKey: "local-dev-key",
+      model: "gpt-4.1-mini",
       isDefault: true
     },
     {
       id: "llm_dialog_mock",
-      name: "Mock Dialogue Rewriter",
-      provider: "custom",
-      baseUrl: "https://mock.local/dialogue",
-      apiKey: "mock-key-never-sent",
-      model: "mock-outline-chat",
+      name: "对话改写",
+      provider: "openai-compatible",
+      baseUrl: "https://api.openai.com/v1",
+      apiKey: "local-dev-key",
+      model: "gpt-4.1-mini",
       isDefault: false
     }
   ];
@@ -35,20 +35,20 @@ export const seedStore = () => {
   const imageConfigs: ImageProviderConfig[] = [
     {
       id: "image_picture_book_mock",
-      name: "Mock Picture Book Image",
+      name: "绘本配图",
       provider: "fal",
-      baseUrl: "https://mock.local/images",
-      apiKey: "mock-key-never-sent",
-      model: "mock-watercolor-xl",
+      baseUrl: "https://fal.run",
+      apiKey: "local-dev-key",
+      model: "flux-dev",
       isDefault: true
     },
     {
       id: "image_sprite_mock",
-      name: "Mock Sprite Sheet Image",
+      name: "精灵图集",
       provider: "replicate",
-      baseUrl: "https://mock.local/sprites",
-      apiKey: "mock-key-never-sent",
-      model: "mock-sprite-sheet",
+      baseUrl: "https://api.replicate.com/v1",
+      apiKey: "local-dev-key",
+      model: "sprite-sheet-v1",
       isDefault: false
     }
   ];
@@ -59,28 +59,28 @@ export const seedStore = () => {
       name: "温暖水彩",
       description: "柔和边缘、温暖光线，适合睡前绘本。",
       promptSuffix: "warm watercolor picture book, soft lighting, gentle paper texture",
-      previewUrl: "/mock/styles/warm-watercolor.png"
+      previewUrl: "/assets/styles/warm-watercolor.png"
     },
     {
       id: "style_soft_pastel",
       name: "柔和粉彩",
       description: "低饱和粉彩与圆润造型，适合低龄儿童。",
       promptSuffix: "soft pastel colors, rounded shapes, cozy children illustration",
-      previewUrl: "/mock/styles/soft-pastel.png"
+      previewUrl: "/assets/styles/soft-pastel.png"
     },
     {
       id: "style_pencil_storybook",
       name: "绘本铅笔",
       description: "铅笔线稿加轻薄上色，保留手作感。",
       promptSuffix: "storybook pencil sketch, light wash colors, hand-drawn texture",
-      previewUrl: "/mock/styles/pencil-storybook.png"
+      previewUrl: "/assets/styles/pencil-storybook.png"
     },
     {
       id: "style_clay_play",
       name: "黏土玩具",
       description: "类似手工黏土摆拍，角色质感亲切可爱。",
       promptSuffix: "clay toy diorama, miniature set, soft studio light",
-      previewUrl: "/mock/styles/clay-play.png"
+      previewUrl: "/assets/styles/clay-play.png"
     }
   ];
 
@@ -90,7 +90,7 @@ export const seedStore = () => {
       name: "宝宝",
       relation: "baby",
       appearance: "圆脸、短刘海，穿黄色背带裤，表情好奇。",
-      referenceImageUrl: "/mock/characters/baby-ref.png",
+      referenceImageUrl: "/assets/characters/baby-ref.png",
       createdAt: seededAt,
       updatedAt: seededAt
     },
@@ -99,7 +99,7 @@ export const seedStore = () => {
       name: "爸爸",
       relation: "dad",
       appearance: "高个子、戴圆框眼镜，蓝色开衫，笑容温和。",
-      referenceImageUrl: "/mock/characters/dad-ref.png",
+      referenceImageUrl: "/assets/characters/dad-ref.png",
       createdAt: seededAt,
       updatedAt: seededAt
     },
@@ -108,7 +108,7 @@ export const seedStore = () => {
       name: "妈妈",
       relation: "mom",
       appearance: "栗色短发，穿米色围裙，喜欢拿一本故事书。",
-      referenceImageUrl: "/mock/characters/mom-ref.png",
+      referenceImageUrl: "/assets/characters/mom-ref.png",
       createdAt: seededAt,
       updatedAt: seededAt
     }

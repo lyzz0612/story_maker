@@ -39,10 +39,10 @@ export const settingsRoutes: FastifyPluginAsync = async (fastify) => {
     const nextItems = readItems(request.body, "LLM").map<LlmProviderConfig>((item) => ({
       id: item.id || makeId("llm"),
       name: item.name?.trim() || "Untitled LLM",
-      provider: item.provider === "custom" ? "custom" : "openai-compatible",
-      baseUrl: item.baseUrl || "https://mock.local/v1",
+      provider: "openai-compatible",
+      baseUrl: item.baseUrl || "https://api.openai.com/v1",
       apiKey: item.apiKey || "",
-      model: item.model || "mock-model",
+      model: item.model || "gpt-4.1-mini",
       isDefault: Boolean(item.isDefault)
     }));
 
@@ -60,12 +60,10 @@ export const settingsRoutes: FastifyPluginAsync = async (fastify) => {
       id: item.id || makeId("image"),
       name: item.name?.trim() || "Untitled Image Model",
       provider:
-        item.provider === "replicate" || item.provider === "openai-compatible" || item.provider === "custom"
-          ? item.provider
-          : "fal",
-      baseUrl: item.baseUrl || "https://mock.local/images",
+        item.provider === "replicate" || item.provider === "openai-compatible" ? item.provider : "fal",
+      baseUrl: item.baseUrl || "https://api.openai.com/v1",
       apiKey: item.apiKey || "",
-      model: item.model || "mock-image-model",
+      model: item.model || "dall-e-3",
       isDefault: Boolean(item.isDefault)
     }));
 

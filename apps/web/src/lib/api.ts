@@ -1,5 +1,6 @@
 import type {
   ArtStyle,
+  AssetSheet,
   Character,
   ImageProviderConfig,
   LlmProviderConfig,
@@ -28,7 +29,73 @@ export type ProjectListItem = ProjectSummary & {
   castCharacterIds?: string[];
 };
 
-export type ArtStyleInput = Pick<ArtStyle, "name" | "description" | "promptSuffix" | "previewUrl">;
+export type ArtStyleInput = Pick<ArtStyle, "name" | "description" | "promptSuffix"> & {
+  previewUrl?: string;
+};
+
+export type DeployStatus = "idle" | "running" | "succeeded" | "failed";
+
+export type DeployState = {
+  status: DeployStatus;
+  startedAt?: string;
+  finishedAt?: string;
+  branch?: string;
+  error?: string;
+};
+
+export type AboutInfo = {
+  name: string;
+  version: string;
+  deploy: {
+    enabled: boolean;
+    available: boolean;
+    branch?: string;
+    state: DeployState;
+  };
+};
+
+export type DeployUpdateResponse = {
+  accepted: boolean;
+  reason?: string;
+  state: DeployState;
+};
+
+export type CharacterInput = Pick<Character, "name" | "appearance"> & {
+  referenceImageUrl?: string;
+};
+
+export type ProjectAssetGenerateInput = {
+  prompt: string;
+  label?: string;
+  imageId?: string;
+  artStyleId?: string;
+};
+
+export type ProjectAssetGenerateResponse = {
+  imageUrl: string;
+  prompt: string;
+};
+
+export type AssetGenerateJobStatus = "queued" | "running" | "succeeded" | "failed";
+
+export type AssetGenerateJob = {
+  id: string;
+  projectId: string;
+  status: AssetGenerateJobStatus;
+  startedAt: string;
+  finishedAt?: string;
+  input: ProjectAssetGenerateInput;
+  result?: ProjectAssetGenerateResponse;
+  error?: string;
+};
+
+export type StartProjectAssetGenerateResponse = {
+  jobId: string;
+  status: AssetGenerateJobStatus;
+  startedAt: string;
+};
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -81,16 +148,24 @@ export const api = {
     request<ArtStyle>(`/art-styles/${id}`, { method: "PUT", body: input }),
   deleteArtStyle: (id: string) =>
     request<void>(`/art-styles/${id}`, { method: "DELETE" }),
+  previewArtStyleDraft: (input: ArtStyleInput) =>
+    request<{ previewUrl: string }>("/art-styles/generate-preview", {
+      method: "POST",
+      body: input
+    }),
 
   listCharacters: () => request<Character[]>("/characters"),
-  createCharacter: (input: Omit<Character, "id" | "createdAt" | "updatedAt">) =>
+  createCharacter: (input: CharacterInput) =>
     request<Character>("/characters", { method: "POST", body: input }),
-  updateCharacter: (id: string, input: Partial<Character>) =>
+  updateCharacter: (id: string, input: CharacterInput) =>
     request<Character>(`/characters/${id}`, { method: "PUT", body: input }),
   deleteCharacter: (id: string) =>
     request<void>(`/characters/${id}`, { method: "DELETE" }),
-  generateCharacterReference: (id: string) =>
-    request<Character>(`/characters/${id}/mock-generate-reference`, { method: "POST" }),
+  previewCharacterReference: (input: CharacterInput) =>
+    request<{ referenceImageUrl: string }>("/characters/generate-reference", {
+      method: "POST",
+      body: input
+    }),
 
   listProjects: () => request<ProjectListItem[]>("/projects"),
   createProject: (input: {
@@ -109,10 +184,87 @@ export const api = {
       method: "PATCH",
       body: input
     }),
-  mockGeneratePage: (projectId: string, pageNumber: number) =>
-    request<OutlinePage>(`/projects/${projectId}/pages/${pageNumber}/mock-generate`, {
+  generatePageImage: (projectId: string, pageNumber: number) =>
+    request<OutlinePage>(`/projects/${projectId}/pages/${pageNumber}/generate`, {
       method: "POST"
-    })
+    }),
+  getAssetSheet: (projectId: string) => request<AssetSheet>(`/projects/${projectId}/asset-sheet`),
+  uploadAssetSheetSource: async (projectId: string, file: File) => {
+    const formData = new FormData();
+    formData.append("file", file, file.name);
+
+    const response = await fetch(`${API_BASE}/projects/${projectId}/asset-sheet/source`, {
+      method: "POST",
+      body: formData
+    });
+
+    if (!response.ok) {
+      let message =
+        response.status === 413
+          ? "上传图片过大，请压缩后重试或缩小图集尺寸"
+          : `请求失败：${response.status}`;
+      try {
+        const payload = (await response.json()) as { message?: string; error?: string };
+        message = payload.message ?? payload.error ?? message;
+      } catch {
+        // Keep the generic message when the API returns plain text or no body.
+      }
+      throw new Error(message);
+    }
+
+    return (await response.json()) as { sourceUrl: string };
+  },
+  startProjectAssetGenerate: (projectId: string, input: ProjectAssetGenerateInput) =>
+    request<StartProjectAssetGenerateResponse>(`/projects/${projectId}/asset-sheet/generate`, {
+      method: "POST",
+      body: input
+    }),
+  getProjectAssetGenerateJob: (projectId: string, jobId: string) =>
+    request<AssetGenerateJob>(`/projects/${projectId}/asset-sheet/generate/${jobId}`),
+  waitForProjectAssetGenerate: async (
+    projectId: string,
+    jobId: string,
+    options: {
+      onUpdate?: (job: AssetGenerateJob) => void;
+      intervalMs?: number;
+      signal?: AbortSignal;
+    } = {}
+  ) => {
+    const intervalMs = options.intervalMs ?? 1000;
+
+    while (true) {
+      if (options.signal?.aborted) {
+        throw new Error("已取消等待生图任务");
+      }
+
+      const job = await request<AssetGenerateJob>(
+        `/projects/${projectId}/asset-sheet/generate/${jobId}`
+      );
+      options.onUpdate?.(job);
+
+      if (job.status === "succeeded") {
+        if (!job.result) {
+          throw new Error("生图任务已完成，但缺少结果");
+        }
+        return job.result;
+      }
+
+      if (job.status === "failed") {
+        throw new Error(job.error ?? "生图失败");
+      }
+
+      await sleep(intervalMs);
+    }
+  },
+  saveAssetSheet: (projectId: string, assetSheet: Partial<AssetSheet>) =>
+    request<AssetSheet>(`/projects/${projectId}/asset-sheet`, {
+      method: "PATCH",
+      body: assetSheet
+    }),
+
+  getAbout: () => request<AboutInfo>("/about"),
+  getDeployStatus: () => request<{ enabled: boolean; state: DeployState }>("/deploy/status"),
+  triggerDeployUpdate: () => request<DeployUpdateResponse>("/deploy/update", { method: "POST" })
 };
 
 export function makeId(prefix: string) {

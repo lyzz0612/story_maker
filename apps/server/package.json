@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@fastify/cors": "latest",
+    "@fastify/multipart": "^10.0.0",
     "@story-maker/scene-schema": "workspace:*",
     "fastify": "latest"
   },

@@ -1,5 +1,144 @@
 import { makeId, now, store } from "./store.js";
-import type { AssetSheet, ChatMessage, OutlinePage, Project, SceneGraph } from "./types.js";
+import type {
+  ArtStyle,
+  AssetSheet,
+  Character,
+  ChatMessage,
+  OutlinePage,
+  Project,
+  SceneGraph
+} from "./types.js";
+
+const ART_STYLE_PREVIEW_SCENE =
+  "A cozy children's picture book scene with a small animal reading under a warm lamp.";
+
+export const buildArtStylePreviewPrompt = (
+  style: Pick<ArtStyle, "name" | "description" | "promptSuffix">
+) => {
+  const mood = style.description.trim() || style.name.trim() || "gentle picture book mood";
+  return [
+    ART_STYLE_PREVIEW_SCENE,
+    `Mood and audience: ${mood}.`,
+    `Visual style: ${style.promptSuffix.trim()}.`,
+    "Single square illustration, no text, no watermark."
+  ].join(" ");
+};
+
+export const mockGenerateArtStylePreview = (
+  style: Pick<ArtStyle, "id" | "name" | "description" | "promptSuffix">
+) => {
+  const prompt = buildArtStylePreviewPrompt(style);
+  const defaultImage =
+    Array.from(store.imageConfigs.values()).find((config) => config.isDefault) ??
+    Array.from(store.imageConfigs.values())[0];
+  const slug = encodeURIComponent(
+    (style.name || "style").toLowerCase().replace(/[^\w-]+/g, "-").slice(0, 24)
+  );
+  const token = Date.now().toString(36);
+  void prompt;
+  void defaultImage;
+  return `/assets/styles/preview-${slug}-${token}.png`;
+};
+
+export const buildCharacterReferencePrompt = (character: Pick<Character, "name" | "appearance">) => {
+  const appearance = character.appearance.trim() || character.name.trim() || "friendly picture book character";
+  return [
+    "Children picture book character reference portrait, full body, plain background.",
+    `Character name: ${character.name.trim() || "unnamed"}.`,
+    `Appearance: ${appearance}.`,
+    "Single character, no text, no watermark."
+  ].join(" ");
+};
+
+export const mockGenerateCharacterReferenceUrl = (
+  character: Pick<Character, "name" | "appearance">
+) => {
+  const prompt = buildCharacterReferencePrompt(character);
+  const defaultImage =
+    Array.from(store.imageConfigs.values()).find((config) => config.isDefault) ??
+    Array.from(store.imageConfigs.values())[0];
+  const slug = encodeURIComponent(
+    (character.name || "character").toLowerCase().replace(/[^\w-]+/g, "-").slice(0, 24)
+  );
+  const token = Date.now().toString(36);
+  void prompt;
+  void defaultImage;
+  return `/assets/characters/generated-${slug}-${token}.png`;
+};
+
+export const buildAssetPrompt = (input: {
+  prompt: string;
+  label?: string;
+  artStyle?: Pick<ArtStyle, "name" | "description" | "promptSuffix"> | null;
+  project?: Pick<Project, "title" | "brief">;
+}) => {
+  const userPrompt = input.prompt.trim();
+  if (!userPrompt) {
+    throw new Error("Asset prompt is required");
+  }
+
+  const parts = [
+    "Children picture book asset illustration, single object or character sprite, plain or simple background.",
+    userPrompt
+  ];
+
+  if (input.label?.trim()) {
+    parts.push(`Asset name: ${input.label.trim()}.`);
+  }
+  if (input.project?.title?.trim()) {
+    parts.push(`Story context: ${input.project.title.trim()}.`);
+  }
+  if (input.project?.brief?.trim()) {
+    parts.push(`Story brief: ${input.project.brief.trim().slice(0, 160)}.`);
+  }
+  if (input.artStyle?.promptSuffix?.trim()) {
+    parts.push(`Visual style: ${input.artStyle.promptSuffix.trim()}.`);
+  } else if (input.artStyle?.name?.trim()) {
+    parts.push(`Visual style mood: ${input.artStyle.name.trim()}.`);
+  }
+
+  parts.push("No text, no watermark.");
+  return parts.join(" ");
+};
+
+export const mockGenerateProjectAsset = async (
+  project: Project,
+  input: {
+    prompt: string;
+    label?: string;
+    imageId?: string;
+    artStyleId?: string;
+  }
+) => {
+  const imageConfig =
+    (input.imageId ? store.imageConfigs.get(input.imageId) : undefined) ??
+    (project.imageId ? store.imageConfigs.get(project.imageId) : undefined) ??
+    Array.from(store.imageConfigs.values()).find((config) => config.isDefault) ??
+    Array.from(store.imageConfigs.values())[0];
+
+  const artStyle =
+    (input.artStyleId ? store.artStyles.get(input.artStyleId) : undefined) ??
+    (project.artStyleId ? store.artStyles.get(project.artStyleId) : undefined) ??
+    null;
+
+  const prompt = buildAssetPrompt({
+    prompt: input.prompt,
+    label: input.label,
+    artStyle,
+    project
+  });
+
+  const slug = encodeURIComponent(
+    (input.label || "asset").toLowerCase().replace(/[^\w-]+/g, "-").slice(0, 24)
+  );
+  const token = `${slug}-${Date.now().toString(36)}`;
+
+  const { saveGeneratedAssetImage } = await import("./assetStorage.js");
+  const imageUrl = await saveGeneratedAssetImage(project.id, token);
+
+  void imageConfig;
+  return { imageUrl, prompt };
+};
 
 const clampPageCount = (value: unknown) => {
   const parsed = typeof value === "number" ? value : Number(value);
@@ -10,9 +149,16 @@ const clampPageCount = (value: unknown) => {
 };
 
 const defaultAssetSheet = (pageNumber: number): AssetSheet => ({
-  sourceUrl: `/mock/pages/page-${pageNumber}-sheet.png`,
+  sourceUrl: `/assets/pages/page-${pageNumber}-sheet.png`,
   regions: [],
   sequences: {}
+});
+
+export const defaultProjectAssetSheet = (): AssetSheet => ({
+  sourceUrl: "",
+  regions: [],
+  sequences: {},
+  updatedAt: now()
 });
 
 export const makeSceneGraph = (projectId: string, page: OutlinePage): SceneGraph => {
@@ -20,13 +166,13 @@ export const makeSceneGraph = (projectId: string, page: OutlinePage): SceneGraph
   if (isBuildingPage) {
     return {
       id: `scene_${projectId}_${page.pageNumber}`,
-      version: "mock-1",
+      version: "1",
       size: { width: 1280, height: 720 },
       layers: [
         {
           id: "background",
           type: "background",
-          url: `/mock/projects/${projectId}/pages/${page.pageNumber}/background.png`,
+          url: `/assets/projects/${projectId}/pages/${page.pageNumber}/background.png`,
           x: 0,
           y: 0,
           width: 1280,
@@ -36,9 +182,9 @@ export const makeSceneGraph = (projectId: string, page: OutlinePage): SceneGraph
           id: "hammering-pig",
           type: "sprite_sequence",
           frames: [
-            `/mock/projects/${projectId}/pages/${page.pageNumber}/hammer-1.png`,
-            `/mock/projects/${projectId}/pages/${page.pageNumber}/hammer-2.png`,
-            `/mock/projects/${projectId}/pages/${page.pageNumber}/hammer-3.png`
+            `/assets/projects/${projectId}/pages/${page.pageNumber}/hammer-1.png`,
+            `/assets/projects/${projectId}/pages/${page.pageNumber}/hammer-2.png`,
+            `/assets/projects/${projectId}/pages/${page.pageNumber}/hammer-3.png`
           ],
           fps: 6,
           loop: true,
@@ -53,7 +199,7 @@ export const makeSceneGraph = (projectId: string, page: OutlinePage): SceneGraph
 
   return {
     id: `scene_${projectId}_${page.pageNumber}`,
-    version: "mock-1",
+    version: "1",
     size: { width: 1280, height: 720 },
     template: "stagger_pop_in",
     trigger: "tap",
@@ -61,7 +207,7 @@ export const makeSceneGraph = (projectId: string, page: OutlinePage): SceneGraph
       {
         id: "background",
         type: "background",
-        url: `/mock/projects/${projectId}/pages/${page.pageNumber}/background.png`,
+        url: `/assets/projects/${projectId}/pages/${page.pageNumber}/background.png`,
         x: 0,
         y: 0,
         width: 1280,
@@ -70,7 +216,7 @@ export const makeSceneGraph = (projectId: string, page: OutlinePage): SceneGraph
       {
         id: "pig-one",
         type: "sprite",
-        url: `/mock/projects/${projectId}/pages/${page.pageNumber}/pig-one.png`,
+        url: `/assets/projects/${projectId}/pages/${page.pageNumber}/pig-one.png`,
         x: 300,
         y: 360,
         width: 160,
@@ -79,7 +225,7 @@ export const makeSceneGraph = (projectId: string, page: OutlinePage): SceneGraph
       {
         id: "pig-two",
         type: "sprite",
-        url: `/mock/projects/${projectId}/pages/${page.pageNumber}/pig-two.png`,
+        url: `/assets/projects/${projectId}/pages/${page.pageNumber}/pig-two.png`,
         x: 560,
         y: 350,
         width: 160,
@@ -88,7 +234,7 @@ export const makeSceneGraph = (projectId: string, page: OutlinePage): SceneGraph
       {
         id: "pig-three",
         type: "sprite",
-        url: `/mock/projects/${projectId}/pages/${page.pageNumber}/pig-three.png`,
+        url: `/assets/projects/${projectId}/pages/${page.pageNumber}/pig-three.png`,
         x: 820,
         y: 365,
         width: 160,
@@ -111,11 +257,12 @@ export const mockGeneratePage = (project: Project, pageNumber: number) => {
 
   const updatedAt = now();
   page.status = "ready";
-  page.imageUrl = `/mock/projects/${project.id}/pages/${pageNumber}/illustration.png`;
-  page.sceneJsonUrl = `/mock/projects/${project.id}/pages/${pageNumber}/scene.json`;
+  const prompt = page.imagePrompt?.trim() || page.summary;
+  page.imageUrl = `/assets/projects/${project.id}/pages/${pageNumber}/illustration.png?prompt=${encodeURIComponent(prompt)}`;
+  page.sceneJsonUrl = `/assets/projects/${project.id}/pages/${pageNumber}/scene.json`;
   page.sceneGraph = makeSceneGraph(project.id, page);
   page.assetSheet = {
-    sourceUrl: `/mock/projects/${project.id}/pages/${pageNumber}/asset-sheet.png`,
+    sourceUrl: `/assets/projects/${project.id}/pages/${pageNumber}/asset-sheet.png`,
     regions:
       pageNumber === 4
         ? [
@@ -145,8 +292,8 @@ export const mockGeneratePage = (project: Project, pageNumber: number) => {
         ? {
             hammer: {
               frames: [
-                `/mock/projects/${project.id}/pages/${pageNumber}/hammer-1.png`,
-                `/mock/projects/${project.id}/pages/${pageNumber}/hammer-2.png`
+                `/assets/projects/${project.id}/pages/${pageNumber}/hammer-1.png`,
+                `/assets/projects/${project.id}/pages/${pageNumber}/hammer-2.png`
               ],
               fps: 6,
               loop: true
@@ -192,6 +339,7 @@ export const buildOutline = (brief: string, castCharacterIds: string[], pageCoun
 
   return Array.from({ length: pageCount }, (_, index) => {
     const pageNumber = index + 1;
+    const summary = summaries[index] ?? summaries[summaries.length - 1]!;
     const pageTemporaryCharacters = isThreePigs
       ? pageNumber <= 2
         ? temporaryCharacters.slice(0, 3)
@@ -204,8 +352,9 @@ export const buildOutline = (brief: string, castCharacterIds: string[], pageCoun
 
     return {
       pageNumber,
-      summary: summaries[index] ?? summaries[summaries.length - 1]!,
-      text: `第 ${pageNumber} 页文案占位：${summaries[index] ?? brief}`,
+      summary,
+      text: `第 ${pageNumber} 页文案占位：${summary}`,
+      imagePrompt: `儿童绘本插画，${summary}，温馨明亮、角色表情生动，无文字水印`,
       castCharacterIds: pageNumber === 1 || pageNumber === pageCount ? selectedCast : selectedCast.slice(0, 1),
       temporaryCharacters: pageTemporaryCharacters,
       status: "draft",
@@ -242,6 +391,7 @@ export const createProjectFromBrief = (input: {
     castCharacterIds: input.castCharacterIds ?? [],
     outline,
     chatMessages: [],
+    assetSheet: defaultProjectAssetSheet(),
     createdAt,
     updatedAt: createdAt
   };
@@ -274,7 +424,7 @@ export const applyMockChat = (project: Project, message: string) => {
   const pageNumber = parsePageNumber(message, project.outline.length) ?? project.outline.length;
   const page = project.outline.find((item) => item.pageNumber === pageNumber)!;
   const characterId = findCharacterIdByKeyword(message);
-  let reply = `已按 mock 规则更新第 ${pageNumber} 页大纲。`;
+  let reply = `已更新第 ${pageNumber} 页大纲。`;
 
   if (characterId && !page.castCharacterIds.includes(characterId)) {
     page.castCharacterIds.push(characterId);
@@ -284,6 +434,7 @@ export const applyMockChat = (project: Project, message: string) => {
   } else if (/scary|可怕|吓人|温馨|柔和/.test(message)) {
     page.summary = `${page.summary} 语气调整为更温馨、更适合睡前阅读。`;
     page.text = `${page.text} 这一页会用轻柔的方式表达冲突，不制造惊吓。`;
+    page.imagePrompt = `${page.imagePrompt ?? page.summary} 画面温馨柔和，适合睡前阅读，避免惊悚元素。`;
     reply = `已把第 ${pageNumber} 页语气调得更温馨，不走 scary 路线。`;
   } else {
     page.summary = `${page.summary}（根据对话补充：${message.slice(0, 24)}）`;

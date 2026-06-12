@@ -1,17 +1,21 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+  type KeyboardEvent
+} from "react";
 import { Link, useParams } from "react-router-dom";
 
-import type { ArtStyle, Character, OutlinePage, Project } from "@story-maker/scene-schema";
+import type { AssetSheet, Character, OutlinePage, Project } from "@story-maker/scene-schema";
 
 import { EmptyState } from "@/components/EmptyState";
+import { ProjectAssetsPanel } from "@/features/assets/ProjectAssetsPanel";
 import { Loading } from "@/components/Loading";
+import { TabBar } from "@/components/TabBar";
 import { api } from "@/lib/api";
-import {
-  formatDate,
-  getCharactersById,
-  pageStatusLabels,
-  relationLabels
-} from "@/lib/format";
+import { getCharactersById, pageStatusLabels, relationLabels } from "@/lib/format";
 
 type WorkspaceTab = "outline" | "pages" | "assets" | "preview";
 
@@ -49,7 +53,6 @@ export function ProjectWorkspace() {
   const { id } = useParams<{ id: string }>();
   const [project, setProject] = useState<Project | null>(null);
   const [characters, setCharacters] = useState<Character[]>([]);
-  const [styles, setStyles] = useState<ArtStyle[]>([]);
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("outline");
   const [currentPageNumber, setCurrentPageNumber] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -58,7 +61,7 @@ export function ProjectWorkspace() {
     {
       id: "welcome",
       role: "assistant",
-      content: "我是 mock 创作助手。你可以说“第 3 页让爸爸出场”或“结尾不要太 scary”。"
+      content: "我是创作助手。你可以说“第 3 页让爸爸出场”或“结尾不要太 scary”。"
     }
   ]);
 
@@ -69,14 +72,9 @@ export function ProjectWorkspace() {
     setLoading(true);
     setError(null);
     try {
-      const [projectData, characterData, styleData] = await Promise.all([
-        api.getProject(id),
-        api.listCharacters(),
-        api.listArtStyles()
-      ]);
+      const [projectData, characterData] = await Promise.all([api.getProject(id), api.listCharacters()]);
       setProject(projectData);
       setCharacters(characterData);
-      setStyles(styleData);
       setCurrentPageNumber(getProjectPages(projectData)[0]?.pageNumber ?? 1);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "加载项目失败");
@@ -90,10 +88,6 @@ export function ProjectWorkspace() {
   }, [load]);
 
   const characterMap = useMemo(() => getCharactersById(characters), [characters]);
-  const lockedStyle = useMemo(
-    () => styles.find((style) => style.id === project?.artStyleId),
-    [project?.artStyleId, styles]
-  );
   const currentPage = useMemo(() => {
     if (!project) {
       return undefined;
@@ -106,6 +100,10 @@ export function ProjectWorkspace() {
 
   function updatePage(nextPage: OutlinePage) {
     setProject((current) => (current ? replacePage(current, nextPage) : current));
+  }
+
+  function updateAssetSheet(assetSheet: AssetSheet) {
+    setProject((current) => (current ? { ...current, assetSheet, updatedAt: assetSheet.updatedAt } : current));
   }
 
   async function sendChat(message: string) {
@@ -168,79 +166,87 @@ export function ProjectWorkspace() {
   }
 
   return (
-    <div className="space-y-6">
-      <header className="card flex items-start justify-between gap-6">
-        <div>
-          <Link className="text-sm font-bold text-berry" to="/">
-            ← 返回项目
-          </Link>
-          <h1 className="mt-3 text-3xl font-black text-ink">{project.title}</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">{project.brief}</p>
-          <p className="mt-3 text-xs font-semibold text-slate-400">
-            更新于 {formatDate(project.updatedAt)}
-          </p>
-        </div>
-        <div className="min-w-56 rounded-3xl bg-paper p-4">
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-berry">Locked Style</p>
-          <p className="mt-2 text-lg font-black text-ink">{lockedStyle?.name ?? "未知画风"}</p>
-          <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">
-            {lockedStyle?.description ?? "项目创建后锁定画风，避免无提示重绘。"}
-          </p>
-        </div>
+    <div className="flex h-[calc(100vh-4rem)] flex-col gap-4">
+      <header className="flex shrink-0 items-center gap-3">
+        <Link className="shrink-0 text-sm font-bold text-berry" to="/">
+          ← 返回
+        </Link>
+        <h1 className="truncate text-xl font-black text-ink">{project.title}</h1>
       </header>
 
-      {error ? <p className="rounded-2xl bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
+      {error ? (
+        <p className="shrink-0 rounded-2xl bg-red-50 p-3 text-sm text-red-700">{error}</p>
+      ) : null}
 
-      <div className="grid grid-cols-[minmax(0,1fr)_360px] gap-6">
-        <section className="min-w-0">
-          <div className="mb-5 flex gap-2 rounded-3xl bg-white/70 p-2 shadow-soft">
-            {workspaceTabs.map((tab) => (
-              <button
-                key={tab.id}
-                className={[
-                  "flex-1 rounded-2xl px-4 py-3 text-sm font-black transition",
-                  activeTab === tab.id ? "bg-ink text-white" : "text-slate-500 hover:bg-white hover:text-ink"
-                ].join(" ")}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-              >
-                {tab.label}
-              </button>
-            ))}
+      <TabBar
+        activeTab={activeTab}
+        className="shrink-0"
+        tabs={workspaceTabs}
+        onChange={setActiveTab}
+      />
+
+      <div className="min-h-0 flex-1">
+        {activeTab === "outline" ? (
+          <div className="grid h-full grid-cols-[360px_minmax(0,1fr)] gap-6">
+            <ChatPanel messages={messages} onSend={(message) => void sendChat(message)} />
+            <section className="flex min-h-0 min-w-0 flex-col gap-4 overflow-y-auto pr-1">
+              <div className="shrink-0">
+                <p className="eyebrow">Outline</p>
+                <h2 className="font-display text-xl font-black text-ink">当前大纲</h2>
+                <p className="mt-1 text-sm text-ink-soft">与助手对话调整分页；点击某一页可跳转到页面编辑。</p>
+              </div>
+              <OutlineTab
+                characterMap={characterMap}
+                currentPageNumber={currentPage?.pageNumber ?? 1}
+                pages={getProjectPages(project)}
+                onSelectPage={(pageNumber) => {
+                  setCurrentPageNumber(pageNumber);
+                  setActiveTab("pages");
+                }}
+              />
+            </section>
           </div>
+        ) : null}
 
-          {activeTab === "outline" ? (
-            <OutlineTab
-              characterMap={characterMap}
+        {activeTab === "pages" ? (
+          <div className="grid h-full grid-cols-[280px_minmax(0,1fr)] gap-6">
+            <PageListNav
               currentPageNumber={currentPage?.pageNumber ?? 1}
               pages={getProjectPages(project)}
-              onSelectPage={(pageNumber) => {
-                setCurrentPageNumber(pageNumber);
-                setActiveTab("pages");
-              }}
+              onSelectPage={setCurrentPageNumber}
             />
-          ) : null}
-          {activeTab === "pages" && currentPage ? (
-            <PageEditor
-              characterMap={characterMap}
-              lockedStyle={lockedStyle}
-              page={currentPage}
-              project={project}
-              onChangePage={setCurrentPageNumber}
-              onPageUpdated={updatePage}
-            />
-          ) : null}
-          {activeTab === "assets" ? <AssetPlaceholder page={currentPage} project={project} /> : null}
-          {activeTab === "preview" ? (
+            <section className="min-h-0 min-w-0 overflow-y-auto pr-1">
+              {currentPage ? (
+                <PageEditor
+                  characterMap={characterMap}
+                  page={currentPage}
+                  project={project}
+                  onPageUpdated={updatePage}
+                />
+              ) : (
+                <EmptyState
+                  description="请先在「大纲」中与助手生成分页内容。"
+                  icon="📄"
+                  title="暂无页面"
+                />
+              )}
+            </section>
+          </div>
+        ) : null}
+
+        {activeTab === "assets" ? (
+          <ProjectAssetsPanel project={project} onAssetSheetUpdated={updateAssetSheet} />
+        ) : null}
+
+        {activeTab === "preview" ? (
+          <section className="h-full overflow-y-auto pr-1">
             <PreviewPlaceholder
               currentPageNumber={currentPage?.pageNumber ?? 1}
               pages={getProjectPages(project)}
               onChangePage={setCurrentPageNumber}
             />
-          ) : null}
-        </section>
-
-        <ChatPanel messages={messages} onSend={(message) => void sendChat(message)} />
+          </section>
+        ) : null}
       </div>
     </div>
   );
@@ -253,9 +259,54 @@ interface OutlineTabProps {
   onSelectPage: (pageNumber: number) => void;
 }
 
+function PageListNav({
+  pages,
+  currentPageNumber,
+  onSelectPage
+}: {
+  pages: OutlinePage[];
+  currentPageNumber: number;
+  onSelectPage: (pageNumber: number) => void;
+}) {
+  return (
+    <nav className="card flex h-full min-h-0 flex-col p-0">
+      <div className="shrink-0 border-b border-paper-deep/70 px-4 py-3.5">
+        <p className="eyebrow">Pages</p>
+        <h2 className="font-display text-lg font-black text-ink">分页列表</h2>
+        <p className="mt-1 text-xs text-ink-soft">共 {pages.length} 页</p>
+      </div>
+      <ul className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-2">
+        {pages.map((page) => {
+          const selected = currentPageNumber === page.pageNumber;
+          return (
+            <li key={page.pageNumber}>
+              <button
+                className={[
+                  "w-full rounded-2xl px-3 py-3 text-left transition",
+                  selected
+                    ? "bg-honey/25 ring-1 ring-honey/50"
+                    : "hover:bg-paper/80"
+                ].join(" ")}
+                type="button"
+                onClick={() => onSelectPage(page.pageNumber)}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-display text-sm font-black text-ink">第 {page.pageNumber} 页</span>
+                  <span className="badge badge-mint text-[10px]">{pageStatusLabels[page.status]}</span>
+                </div>
+                <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-ink-soft">{page.summary}</p>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
+
 function OutlineTab({ pages, currentPageNumber, characterMap, onSelectPage }: OutlineTabProps) {
   return (
-    <div className="grid grid-cols-2 gap-4">
+    <div className="grid grid-cols-2 gap-4 pb-2">
       {pages.map((page) => {
         const selected = currentPageNumber === page.pageNumber;
         const fixedCharacters = page.castCharacterIds
@@ -302,55 +353,48 @@ function OutlineTab({ pages, currentPageNumber, characterMap, onSelectPage }: Ou
 interface PageEditorProps {
   project: Project;
   page: OutlinePage;
-  lockedStyle?: ArtStyle;
   characterMap: Map<string, Character>;
-  onChangePage: (pageNumber: number) => void;
   onPageUpdated: (page: OutlinePage) => void;
 }
 
-function PageEditor({
-  project,
-  page,
-  lockedStyle,
-  characterMap,
-  onChangePage,
-  onPageUpdated
-}: PageEditorProps) {
+function PageEditor({ project, page, characterMap, onPageUpdated }: PageEditorProps) {
   const [text, setText] = useState(page.text);
+  const [imagePrompt, setImagePrompt] = useState(page.imagePrompt ?? page.summary);
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setText(page.text);
-  }, [page.pageNumber, page.text]);
+    setImagePrompt(page.imagePrompt ?? page.summary);
+  }, [page.pageNumber, page.text, page.imagePrompt, page.summary]);
 
   const fixedCharacters = page.castCharacterIds
     .map((characterId) => characterMap.get(characterId))
     .filter((character): character is Character => Boolean(character));
 
-  async function saveText() {
+  async function savePage() {
     setSaving(true);
     setError(null);
     try {
-      const saved = await api.updateProjectPage(project.id, page.pageNumber, { text });
+      const saved = await api.updateProjectPage(project.id, page.pageNumber, { text, imagePrompt });
       onPageUpdated(saved);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "保存文案失败");
+      setError(reason instanceof Error ? reason.message : "保存页面失败");
     } finally {
       setSaving(false);
     }
   }
 
-  async function mockGenerate() {
+  async function generateImage() {
     setGenerating(true);
     setError(null);
     onPageUpdated({ ...page, status: "generating" });
     try {
-      const generated = await api.mockGeneratePage(project.id, page.pageNumber);
+      const generated = await api.generatePageImage(project.id, page.pageNumber);
       onPageUpdated(generated);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "模拟生成配图失败");
+      setError(reason instanceof Error ? reason.message : "生成配图失败");
       onPageUpdated(page);
     } finally {
       setGenerating(false);
@@ -359,24 +403,10 @@ function PageEditor({
 
   return (
     <div className="card">
-      <div className="mb-5 flex items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-berry">
-            Page {page.pageNumber}
-          </p>
-          <h2 className="mt-2 text-2xl font-black text-ink">{page.summary}</h2>
-        </div>
-        <select
-          className="field w-36"
-          value={page.pageNumber}
-          onChange={(event) => onChangePage(Number(event.target.value))}
-        >
-          {getProjectPages(project).map((item) => (
-            <option key={item.pageNumber} value={item.pageNumber}>
-              第 {item.pageNumber} 页
-            </option>
-          ))}
-        </select>
+      <div className="mb-5">
+        <p className="eyebrow">Page {page.pageNumber}</p>
+        <h2 className="font-display mt-2 text-2xl font-black text-ink">{page.summary}</h2>
+        <p className="mt-1 text-sm text-ink-soft">在左侧列表切换其他分页。</p>
       </div>
 
       {error ? <p className="mb-4 rounded-2xl bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
@@ -389,17 +419,14 @@ function PageEditor({
                 <img alt={`第 ${page.pageNumber} 页配图`} className="h-full w-full object-cover" src={page.imageUrl} />
               ) : (
                 <span className="px-8 text-center text-sm font-bold text-slate-500">
-                  一页一图占位区，点击下方按钮模拟生成。
+                  一页一图占位区，点击下方按钮生成配图。
                 </span>
               )}
             </div>
             <div className="p-4">
-              <div className="flex items-center justify-between">
-                <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-slate-600">
-                  {pageStatusLabels[generating ? "generating" : page.status]}
-                </span>
-                <span className="text-xs font-semibold text-slate-400">{lockedStyle?.name ?? "未知画风"}</span>
-              </div>
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-slate-600">
+                {pageStatusLabels[generating ? "generating" : page.status]}
+              </span>
               {page.sceneJsonPath ? (
                 <p className="mt-3 break-all rounded-2xl bg-white p-3 text-xs text-slate-500">
                   scene.json: {page.sceneJsonPath}
@@ -407,13 +434,22 @@ function PageEditor({
               ) : null}
             </div>
           </div>
+          <label className="block">
+            <span className="mb-2 block text-sm font-black text-ink">配图生成词</span>
+            <textarea
+              className="field min-h-32"
+              value={imagePrompt}
+              onChange={(event) => setImagePrompt(event.target.value)}
+              placeholder="描述画面构图、角色动作、光线与画风，供生图模型使用"
+            />
+          </label>
           <button
             className="btn-primary w-full"
             disabled={generating}
             type="button"
-            onClick={() => void mockGenerate()}
+            onClick={() => void generateImage()}
           >
-            {generating ? "生成中..." : "模拟生成配图"}
+            {generating ? "生成中..." : "生成配图"}
           </button>
         </div>
 
@@ -451,14 +487,15 @@ function PageEditor({
           </div>
           <label className="block">
             <span className="mb-2 block text-sm font-black text-ink">页面文案</span>
+            <p className="mb-2 text-xs text-slate-500">读者在绘本中看到的旁白或对白，与生图提示词分开维护。</p>
             <textarea
               className="field min-h-64"
               value={text}
               onChange={(event) => setText(event.target.value)}
             />
           </label>
-          <button className="btn-primary" disabled={saving} type="button" onClick={() => void saveText()}>
-            {saving ? "保存中..." : "保存文案"}
+          <button className="btn-primary" disabled={saving} type="button" onClick={() => void savePage()}>
+            {saving ? "保存中..." : "保存页面"}
           </button>
         </div>
       </div>
@@ -474,8 +511,7 @@ interface ChatPanelProps {
 function ChatPanel({ messages, onSend }: ChatPanelProps) {
   const [draft, setDraft] = useState("");
 
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function submitMessage() {
     const message = draft.trim();
     if (!message) {
       return;
@@ -484,65 +520,72 @@ function ChatPanel({ messages, onSend }: ChatPanelProps) {
     setDraft("");
   }
 
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    submitMessage();
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      submitMessage();
+    }
+  }
+
+  const canSend = draft.trim().length > 0;
+
   return (
-    <aside className="card sticky top-8 h-[calc(100vh-4rem)] min-h-[620px]">
-      <div>
-        <p className="text-xs font-black uppercase tracking-[0.2em] text-berry">Mock Chat</p>
-        <h2 className="mt-2 text-xl font-black text-ink">大纲助手</h2>
-        <p className="mt-1 text-sm text-slate-500">发送后会刷新大纲或当前页数据。</p>
+    <aside className="card flex h-full min-h-0 flex-col p-0">
+      <div className="shrink-0 border-b border-paper-deep/70 px-5 py-4">
+        <p className="eyebrow">对话</p>
+        <h2 className="font-display mt-2 text-xl font-black text-ink">大纲助手</h2>
+        <p className="mt-1 text-sm text-ink-soft">发送后会刷新大纲或当前页数据。</p>
       </div>
-      <div className="mt-5 flex h-[calc(100%-12rem)] flex-col gap-3 overflow-y-auto pr-1">
+
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 py-4">
         {messages.map((message) => (
           <div
             key={message.id}
             className={[
-              "rounded-3xl p-4 text-sm leading-6",
-              message.role === "user" ? "ml-8 bg-ink text-white" : "mr-8 bg-paper text-slate-600"
+              "max-w-[92%] rounded-2xl px-4 py-3 text-sm leading-relaxed",
+              message.role === "user"
+                ? "ml-auto bg-ink text-white shadow-soft"
+                : "mr-auto border border-paper-deep/80 bg-paper/80 text-ink-soft"
             ].join(" ")}
           >
             {message.content}
           </div>
         ))}
       </div>
-      <form className="mt-5 flex gap-2" onSubmit={submit}>
-        <textarea
-          className="field min-h-24 flex-1"
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          placeholder="例如：第 3 页让爸爸出场"
-        />
-        <button className="btn-primary self-end" type="submit">
-          发送
-        </button>
+
+      <form className="shrink-0 border-t border-paper-deep/70 bg-paper/30 p-4" onSubmit={submit}>
+        <div className="overflow-hidden rounded-2xl border border-paper-deep bg-white/95 transition focus-within:border-honey focus-within:ring-4 focus-within:ring-honey/15">
+          <textarea
+            className="block max-h-36 min-h-[5.25rem] w-full resize-none border-0 bg-transparent px-4 pb-2 pt-3.5 text-sm leading-relaxed text-ink outline-none placeholder:text-ink-soft/45"
+            value={draft}
+            rows={3}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="例如：第 3 页让爸爸出场"
+          />
+          <div className="flex items-center justify-between gap-3 border-t border-paper-deep/50 bg-paper/50 px-3 py-2">
+            <span className="text-[11px] font-medium text-ink-soft/55">
+              Enter 发送 · Shift+Enter 换行
+            </span>
+            <button
+              className="btn-primary inline-flex items-center gap-1.5 px-4 py-2 text-sm"
+              disabled={!canSend}
+              type="submit"
+            >
+              <span aria-hidden className="text-xs opacity-90">
+                ✦
+              </span>
+              发送
+            </button>
+          </div>
+        </div>
       </form>
     </aside>
-  );
-}
-
-function AssetPlaceholder({ project, page }: { project: Project; page?: OutlinePage }) {
-  return (
-    <div className="card">
-      <p className="text-xs font-black uppercase tracking-[0.2em] text-berry">Assets</p>
-      <h2 className="mt-2 text-2xl font-black text-ink">资产区域占位</h2>
-      <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
-        这里保留页级资产接口入口：后续可加载图集、绘制矩形区域、编辑 role / sequenceId /
-        frameIndex，并保存到 <span className="font-bold text-ink">asset-sheet</span> API。
-      </p>
-      <div className="mt-6 grid grid-cols-3 gap-4">
-        <div className="rounded-3xl bg-paper p-4">
-          <p className="text-sm font-black text-ink">项目</p>
-          <p className="mt-1 text-sm text-slate-500">{project.title}</p>
-        </div>
-        <div className="rounded-3xl bg-paper p-4">
-          <p className="text-sm font-black text-ink">当前页</p>
-          <p className="mt-1 text-sm text-slate-500">第 {page?.pageNumber ?? 1} 页</p>
-        </div>
-        <div className="rounded-3xl bg-paper p-4">
-          <p className="text-sm font-black text-ink">接口</p>
-          <p className="mt-1 text-xs text-slate-500">/projects/:id/pages/:n/asset-sheet</p>
-        </div>
-      </div>
-    </div>
   );
 }
 

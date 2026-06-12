@@ -20,7 +20,7 @@ export type AssetRole = "background" | "sprite_frame" | "preview_only";
 export type LlmProviderConfig = SchemaBacked<SchemaLlmProviderConfig> & {
   id: string;
   name: string;
-  provider: "openai-compatible" | "custom";
+  provider: "openai-compatible";
   baseUrl: string;
   apiKey: string;
   model: string;
@@ -30,7 +30,7 @@ export type LlmProviderConfig = SchemaBacked<SchemaLlmProviderConfig> & {
 export type ImageProviderConfig = SchemaBacked<SchemaImageProviderConfig> & {
   id: string;
   name: string;
-  provider: "fal" | "replicate" | "openai-compatible" | "custom";
+  provider: "fal" | "replicate" | "openai-compatible";
   baseUrl: string;
   apiKey: string;
   model: string;
@@ -61,6 +61,8 @@ export type AssetRegion = {
   rect: { x: number; y: number; w: number; h: number };
   sequenceId?: string;
   frameIndex?: number;
+  label?: string;
+  imageUrl?: string;
 };
 
 export type AssetSheet = SchemaBacked<SchemaAssetSheet> & {
@@ -105,6 +107,7 @@ export type OutlinePage = SchemaBacked<SchemaOutlinePage> & {
   pageNumber: number;
   summary: string;
   text: string;
+  imagePrompt: string;
   castCharacterIds: string[];
   temporaryCharacters: string[];
   status: PageStatus;
@@ -132,6 +135,7 @@ export type Project = SchemaBacked<SchemaProject> & {
   castCharacterIds: string[];
   outline: OutlinePage[];
   chatMessages: ChatMessage[];
+  assetSheet?: AssetSheet;
   createdAt: string;
   updatedAt: string;
 };
