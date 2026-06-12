@@ -70,6 +70,7 @@ export type AssetSheet = SchemaBacked<SchemaAssetSheet> & {
   regions: AssetRegion[];
   sequences: Record<string, { frames: string[]; fps: number; loop: boolean }>;
   exports?: Record<string, string>;
+  updatedAt: string;
 };
 
 export type SceneGraph = SchemaBacked<SchemaSceneGraph> & {

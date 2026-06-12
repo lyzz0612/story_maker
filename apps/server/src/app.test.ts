@@ -312,8 +312,9 @@ describe("API", () => {
         url: `/api/projects/${project.id}/asset-sheet/generate/${jobId}`
       });
       expect(jobResponse.statusCode).toBe(200);
-      generated = jobResponse.json();
-      if (generated.status === "succeeded" || generated.status === "failed") {
+      const job = jobResponse.json<{ status: string; result?: { imageUrl: string; prompt: string } }>();
+      generated = job;
+      if (job.status === "succeeded" || job.status === "failed") {
         break;
       }
       await new Promise((resolve) => setTimeout(resolve, 10));

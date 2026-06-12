@@ -151,7 +151,8 @@ const clampPageCount = (value: unknown) => {
 const defaultAssetSheet = (pageNumber: number): AssetSheet => ({
   sourceUrl: `/assets/pages/page-${pageNumber}-sheet.png`,
   regions: [],
-  sequences: {}
+  sequences: {},
+  updatedAt: now()
 });
 
 export const defaultProjectAssetSheet = (): AssetSheet => ({
@@ -299,7 +300,8 @@ export const mockGeneratePage = (project: Project, pageNumber: number) => {
               loop: true
             }
           }
-        : {}
+        : {},
+    updatedAt
   };
   page.updatedAt = updatedAt;
   project.updatedAt = updatedAt;
