@@ -116,13 +116,14 @@ export type StartProjectAssetGenerateResponse = {
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const hasBody = options.body !== undefined;
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
-      "Content-Type": "application/json",
+      ...(hasBody ? { "Content-Type": "application/json" } : {}),
       ...options.headers
     },
-    body: options.body === undefined ? undefined : JSON.stringify(options.body)
+    body: hasBody ? JSON.stringify(options.body) : undefined
   });
 
   if (!response.ok) {
