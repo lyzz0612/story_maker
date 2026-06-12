@@ -46,12 +46,30 @@ export type DeployState = {
 export type AboutInfo = {
   name: string;
   version: string;
+  repoRoot: string;
   deploy: {
     enabled: boolean;
     available: boolean;
     branch?: string;
     state: DeployState;
+    updateSupported: boolean;
+    gitRemote?: string;
+    gitBranch?: string;
+    gitCommit?: string;
+    gitUpstreamCommit?: string;
+    updateAvailable: boolean;
+    behindCommits: number;
   };
+};
+
+export type DeployPullResponse = {
+  success: boolean;
+  message: string;
+  output: string;
+  version: string;
+  gitCommit?: string;
+  restartRequired: boolean;
+  state: DeployState;
 };
 
 export type DeployUpdateResponse = {
@@ -264,6 +282,8 @@ export const api = {
 
   getAbout: () => request<AboutInfo>("/about"),
   getDeployStatus: () => request<{ enabled: boolean; state: DeployState }>("/deploy/status"),
+  checkDeployUpdate: () => request<AboutInfo>("/deploy/update/check", { method: "POST" }),
+  pullDeployUpdate: () => request<DeployPullResponse>("/deploy/update/pull", { method: "POST" }),
   triggerDeployUpdate: () => request<DeployUpdateResponse>("/deploy/update", { method: "POST" })
 };
 

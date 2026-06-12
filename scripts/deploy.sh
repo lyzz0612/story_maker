@@ -17,7 +17,7 @@ echo "branch: $BRANCH"
 cd "$REPO_PATH"
 
 git fetch origin "$BRANCH"
-git reset --hard "origin/$BRANCH"
+git pull --ff-only origin "$BRANCH"
 
 corepack enable
 pnpm install --frozen-lockfile

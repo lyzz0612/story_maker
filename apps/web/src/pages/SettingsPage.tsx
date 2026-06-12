@@ -696,7 +696,10 @@ function ArtStyleManager() {
 function AboutPanel() {
   const [about, setAbout] = useState<AboutInfo | null>(null);
   const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [pulling, setPulling] = useState(false);
+  const [updateOutput, setUpdateOutput] = useState("");
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -727,25 +730,49 @@ function AboutPanel() {
     return () => window.clearInterval(timer);
   }, [about?.deploy.state.status, load]);
 
-  async function handleUpdate() {
-    setUpdating(true);
+  async function handleCheckUpdate() {
+    setChecking(true);
     setError(null);
+    setStatusMessage(null);
     try {
-      const result = await api.triggerDeployUpdate();
-      if (!result.accepted) {
-        setError(result.reason ?? "已有更新任务在运行");
+      const next = await api.checkDeployUpdate();
+      setAbout(next);
+      if (next.deploy.updateAvailable) {
+        setStatusMessage(
+          `发现 ${next.deploy.behindCommits} 个新提交（${next.deploy.gitUpstreamCommit ?? "远程"}）。`
+        );
+      } else {
+        setStatusMessage("当前已是最新版本。");
       }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "检查更新失败");
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  async function handlePullUpdate() {
+    setPulling(true);
+    setError(null);
+    setStatusMessage(null);
+    setUpdateOutput("");
+    try {
+      const result = await api.pullDeployUpdate();
+      setUpdateOutput(result.output);
+      setStatusMessage(result.message);
       await load();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "触发更新失败");
+      setError(reason instanceof Error ? reason.message : "拉取更新失败");
     } finally {
-      setUpdating(false);
+      setPulling(false);
       setConfirmOpen(false);
     }
   }
 
   const deployState = about?.deploy.state;
-  const canUpdate = about?.deploy.available && deployState?.status !== "running";
+  const deploy = about?.deploy;
+  const canPull =
+    deploy?.available && deployState?.status !== "running" && !checking && !pulling;
 
   return (
     <div className="page-enter-delay-2">
@@ -754,7 +781,7 @@ function AboutPanel() {
           <p className="eyebrow mb-2">应用信息</p>
           <h2 className="font-display text-2xl font-black text-ink">关于 Story Maker</h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
-            查看当前版本，并在服务器上手动拉取最新代码并重新部署。
+            查看当前版本与 Git 状态，并在服务器上手动拉取最新代码、构建并重启服务。
           </p>
         </div>
 
@@ -762,6 +789,11 @@ function AboutPanel() {
         {error ? (
           <p className="mb-4 rounded-2xl border border-berry/20 bg-berry/10 p-3 text-sm font-semibold text-berry">
             {error}
+          </p>
+        ) : null}
+        {statusMessage ? (
+          <p className="mb-4 rounded-2xl border border-mint/25 bg-mint/10 p-3 text-sm font-semibold text-ink">
+            {statusMessage}
           </p>
         ) : null}
 
@@ -776,6 +808,12 @@ function AboutPanel() {
                 <div className="flex items-center justify-between gap-4 border-b border-paper-deep/50 pb-3">
                   <dt className="font-semibold text-ink-soft">版本</dt>
                   <dd className="font-mono font-bold text-ink">v{about.version}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-4 border-b border-paper-deep/50 pb-3">
+                  <dt className="font-semibold text-ink-soft">仓库目录</dt>
+                  <dd className="max-w-[14rem] truncate font-mono text-xs font-bold text-ink" title={about.repoRoot}>
+                    {about.repoRoot}
+                  </dd>
                 </div>
                 <div className="flex items-center justify-between gap-4 border-b border-paper-deep/50 pb-3">
                   <dt className="font-semibold text-ink-soft">手动更新</dt>
@@ -795,9 +833,9 @@ function AboutPanel() {
             <div className="panel space-y-4">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="font-display text-sm font-black text-ink">更新状态</p>
+                  <p className="font-display text-sm font-black text-ink">GitHub 更新</p>
                   <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-                    从 Git 拉取代码、构建并通过 pm2 重新加载服务。
+                    将执行 git pull、pnpm install、pnpm build，并在可用时通过 pm2 重载服务。
                   </p>
                 </div>
                 <span
@@ -816,22 +854,58 @@ function AboutPanel() {
                 </span>
               </div>
 
-              <dl className="grid gap-2 rounded-2xl border border-paper-deep/70 bg-paper/60 p-4 text-sm">
-                <div className="flex justify-between gap-4">
-                  <dt className="text-ink-soft">最近开始</dt>
-                  <dd className="font-semibold text-ink">{formatDate(deployState?.startedAt)}</dd>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-ink-soft">最近结束</dt>
-                  <dd className="font-semibold text-ink">{formatDate(deployState?.finishedAt)}</dd>
-                </div>
-                {deployState?.error ? (
-                  <div className="border-t border-paper-deep/60 pt-3">
-                    <dt className="mb-1 text-ink-soft">错误信息</dt>
-                    <dd className="font-mono text-xs leading-5 text-berry">{deployState.error}</dd>
+              {deploy?.updateSupported ? (
+                <dl className="grid gap-2 rounded-2xl border border-paper-deep/70 bg-paper/60 p-4 text-sm">
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-ink-soft">远程仓库</dt>
+                    <dd className="max-w-[14rem] truncate font-mono text-xs font-semibold text-ink" title={deploy.gitRemote}>
+                      {deploy.gitRemote ?? "-"}
+                    </dd>
                   </div>
-                ) : null}
-              </dl>
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-ink-soft">当前分支</dt>
+                    <dd className="font-mono font-semibold text-ink">{deploy.gitBranch ?? "-"}</dd>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-ink-soft">本地提交</dt>
+                    <dd className="font-mono font-semibold text-ink">{deploy.gitCommit ?? "-"}</dd>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-ink-soft">远程提交</dt>
+                    <dd className="font-mono font-semibold text-ink">
+                      {deploy.gitUpstreamCommit ?? "尚未检查"}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-ink-soft">更新状态</dt>
+                    <dd className="font-semibold text-ink">
+                      {deploy.updateAvailable
+                        ? `有 ${deploy.behindCommits} 个新提交可拉取`
+                        : "已是最新（基于上次检查）"}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-4 border-t border-paper-deep/60 pt-3">
+                    <dt className="text-ink-soft">最近开始</dt>
+                    <dd className="font-semibold text-ink">{formatDate(deployState?.startedAt)}</dd>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-ink-soft">最近结束</dt>
+                    <dd className="font-semibold text-ink">{formatDate(deployState?.finishedAt)}</dd>
+                  </div>
+                  {deployState?.error ? (
+                    <div className="border-t border-paper-deep/60 pt-3">
+                      <dt className="mb-1 text-ink-soft">错误信息</dt>
+                      <dd className="font-mono text-xs leading-5 text-berry">{deployState.error}</dd>
+                    </div>
+                  ) : null}
+                </dl>
+              ) : (
+                <p className="rounded-2xl border border-paper-deep/80 bg-paper/70 p-3 text-sm leading-relaxed text-ink-soft">
+                  当前运行目录不是 Git 仓库，无法从 GitHub 拉取更新。请在克隆的仓库目录中启动服务，或通过{" "}
+                  <code className="rounded bg-white/70 px-1.5 py-0.5 font-mono text-xs">REPO_ROOT</code>{" "}
+                  指定仓库路径。
+                </p>
+              )}
 
               {!about.deploy.available ? (
                 <p className="rounded-2xl border border-paper-deep/80 bg-paper/70 p-3 text-sm leading-relaxed text-ink-soft">
@@ -843,22 +917,33 @@ function AboutPanel() {
 
               <div className="flex flex-wrap gap-3">
                 <button
+                  className="btn-secondary"
+                  disabled={!deploy?.available || checking || pulling || deployState?.status === "running"}
+                  type="button"
+                  onClick={() => void handleCheckUpdate()}
+                >
+                  {checking ? "检查中..." : "检查更新"}
+                </button>
+                <button
                   className="btn-primary"
-                  disabled={!canUpdate || updating}
+                  disabled={!canPull}
                   type="button"
                   onClick={() => setConfirmOpen(true)}
                 >
-                  {updating || deployState?.status === "running" ? "更新中..." : "手动更新"}
+                  {pulling || deployState?.status === "running" ? "更新中..." : "拉取并构建"}
                 </button>
                 <button className="btn-secondary" type="button" onClick={() => void load()}>
                   刷新状态
                 </button>
               </div>
 
-              {deployState?.status === "succeeded" ? (
-                <p className="text-xs leading-relaxed text-ink-soft">
-                  更新完成后服务会自动重载。若页面异常，请手动刷新浏览器。
-                </p>
+              {updateOutput ? (
+                <div className="rounded-2xl border border-paper-deep/70 bg-ink/95 p-4 text-left">
+                  <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-white/60">命令输出</p>
+                  <pre className="max-h-64 overflow-auto whitespace-pre-wrap font-mono text-xs leading-5 text-white/90">
+                    {updateOutput}
+                  </pre>
+                </div>
               ) : null}
             </div>
           </div>
@@ -867,11 +952,11 @@ function AboutPanel() {
 
       <ConfirmDialog
         open={confirmOpen}
-        title="开始手动更新？"
-        description="将从远程仓库拉取最新代码、执行构建并重启服务。更新期间创作功能可能短暂不可用。"
+        title="拉取并构建更新？"
+        description="将从远程仓库拉取最新代码、安装依赖并重新构建。若 pm2 不可用，完成后需要手动重启服务。"
         confirmLabel="开始更新"
         onCancel={() => setConfirmOpen(false)}
-        onConfirm={() => void handleUpdate()}
+        onConfirm={() => void handlePullUpdate()}
       />
     </div>
   );

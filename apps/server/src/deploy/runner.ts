@@ -41,7 +41,7 @@ let state: DeployState = { status: "idle" };
 
 export const getDeployState = () => ({ ...state });
 
-const setState = (next: DeployState) => {
+export const setDeployState = (next: DeployState) => {
   state = next;
 };
 
@@ -53,7 +53,7 @@ export const triggerDeploy = (config: DeployConfig, branch?: string) => {
   const targetBranch = branch?.trim() || config.branch;
   const startedAt = new Date().toISOString();
 
-  setState({
+  setDeployState({
     status: "running",
     startedAt,
     branch: targetBranch
@@ -64,7 +64,7 @@ export const triggerDeploy = (config: DeployConfig, branch?: string) => {
   child.unref();
 
   child.on("error", (error) => {
-    setState({
+    setDeployState({
       status: "failed",
       startedAt,
       finishedAt: new Date().toISOString(),
@@ -79,7 +79,7 @@ export const triggerDeploy = (config: DeployConfig, branch?: string) => {
     }
 
     if (code === 0) {
-      setState({
+      setDeployState({
         status: "succeeded",
         startedAt,
         finishedAt: new Date().toISOString(),
@@ -88,7 +88,7 @@ export const triggerDeploy = (config: DeployConfig, branch?: string) => {
       return;
     }
 
-    setState({
+    setDeployState({
       status: "failed",
       startedAt,
       finishedAt: new Date().toISOString(),

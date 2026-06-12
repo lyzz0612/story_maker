@@ -10,6 +10,11 @@ export type DeployConfig = {
   branch: string;
 };
 
+export const getRepoRoot = () =>
+  process.env.REPO_ROOT?.trim() ||
+  process.env.DEPLOY_REPO_PATH?.trim() ||
+  repoRoot;
+
 export const isDeployEnabled = () => process.env.DEPLOY_ENABLED === "true";
 
 export const getDeployConfig = (): DeployConfig | null => {
